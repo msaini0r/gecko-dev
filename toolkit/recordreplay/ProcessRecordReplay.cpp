@@ -316,7 +316,9 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   MOZ_RELEASE_ASSERT(dispatchAddress.isSome());
 
   Maybe<std::string> apiKey;
-  const char* val = getenv("RECORD_REPLAY_API_KEY");
+  // this environment variable is set by server/actors/replay/connection.js
+  // to contain the API key or user token
+  const char* val = getenv("RECORD_REPLAY_AUTH");
   if (val && val[0]) {
     apiKey.emplace(val);
     // Unsetting the env var will make the variable unavailable via
@@ -325,8 +327,10 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
     // existed and won't capture it in the recording itself, which
     // is ideal for security.
 #ifdef XP_WIN
+    MOZ_RELEASE_ASSERT(!_putenv("RECORD_REPLAY_AUTH="));
     MOZ_RELEASE_ASSERT(!_putenv("RECORD_REPLAY_API_KEY="));
 #else
+    MOZ_RELEASE_ASSERT(!unsetenv("RECORD_REPLAY_AUTH"));
     MOZ_RELEASE_ASSERT(!unsetenv("RECORD_REPLAY_API_KEY"));
 #endif
   }

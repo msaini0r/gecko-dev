@@ -2,7 +2,6 @@
 const {
   getLatestReplayRevision,
   sendBuildTestRequest,
-  spawnChecked,
   newTask,
 } = require("../utils");
 
@@ -16,8 +15,11 @@ if (branchName.includes("webreplay-release")) {
 
 const replayRevision = getLatestReplayRevision();
 
+const driverRevision = process.env.DRIVER_REVISION;
+console.log("DriverRevision", driverRevision);
+
 sendBuildTestRequest({
-  name: `Gecko Build/Test Branch ${branchName} ${replayRevision}`,
+  name: `Gecko Build/Test Branch ${branchName} ${replayRevision}${driverRevision ? " driver " + driverRevision : ""}`,
   tasks: [
     ...platformTasks("macOS"),
     ...platformTasks("linux"),
@@ -33,6 +35,7 @@ function platformTasks(platform) {
       runtime: "gecko",
       revision: replayRevision,
       branch: branchName,
+      driverRevision,
     },
     platform
   );
@@ -43,6 +46,7 @@ function platformTasks(platform) {
       kind: "StaticLiveTests",
       runtime: "gecko",
       revision: replayRevision,
+      driverRevision,
     },
     platform,
     [buildReplayTask]

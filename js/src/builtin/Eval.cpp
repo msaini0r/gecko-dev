@@ -266,7 +266,11 @@ static bool EvalKernel(JSContext* cx, HandleValue v, EvalType evalType,
 
   EvalScriptGuard esg(cx);
 
-  if (evalType == DIRECT_EVAL && caller.isFunctionFrame()) {
+  if (evalType == DIRECT_EVAL && caller.isFunctionFrame() &&
+      // The eval cache is purged at non-deterministic points during GC, and affects
+      // when the debugger's new script notification fires. Disable the cache when
+      // recording/replaying to avoid this non-determinism.
+      !mozilla::recordreplay::IsRecordingOrReplaying()) {
     esg.lookupInEvalCache(linearStr, callerScript, pc);
   }
 

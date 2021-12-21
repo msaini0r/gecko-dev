@@ -605,7 +605,7 @@ class ContentChild final : public PContentChild,
   nsresult AsyncOpenAnonymousTemporaryFile(
       const AnonymousTemporaryFileCallback& aCallback);
 
-  mozilla::ipc::IPCResult RecvFinishRecording();
+  mozilla::ipc::IPCResult RecvFinishRecording(const nsCString& aInvalidateReason);
 
   mozilla::ipc::IPCResult RecvCrossProcessRedirect(
       RedirectToRealChannelArgs&& aArgs,

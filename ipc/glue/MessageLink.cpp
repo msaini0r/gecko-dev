@@ -101,6 +101,11 @@ PortLink::~PortLink() {
 void PortLink::SendMessage(UniquePtr<Message> aMessage) {
   mChan->mMonitor->AssertCurrentThreadOwns();
 
+  // Check that messages sent over IPC channels have consistent contents when
+  // recording vs. replaying.
+  mozilla::recordreplay::RecordReplayAssert("PortLink::SendMessage %d %d %u",
+                                            aMessage->type(), aMessage->routing_id(), aMessage->size());
+
   if (aMessage->size() > IPC::Channel::kMaximumMessageSize) {
     CrashReporter::AnnotateCrashReport(
         CrashReporter::Annotation::IPCMessageName,

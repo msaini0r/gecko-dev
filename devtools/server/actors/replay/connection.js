@@ -23,8 +23,14 @@ const { CryptoUtils } = ChromeUtils.import(
 const ReplayAuth = ChromeUtils.import(
   "resource://devtools/server/actors/replay/auth.js"
 );
+const { queryAPIServer } = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/api-server.js"
+);
 const { pingTelemetry } = ChromeUtils.import(
   "resource://devtools/server/actors/replay/telemetry.js"
+);
+const { getenv, setenv } = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/env.js"
 );
 
 ChromeUtils.defineModuleGetter(
@@ -54,20 +60,7 @@ XPCOMUtils.defineLazyModuleGetters(this, {
 
 let updateStatusCallback = null;
 let connectionStatus = "cloudConnecting.label";
-
-function getenv(name) {
-  const env = Cc["@mozilla.org/process/environment;1"].getService(
-    Ci.nsIEnvironment
-  );
-  return env.get(name);
-}
-
-function setenv(name, value) {
-  const env = Cc["@mozilla.org/process/environment;1"].getService(
-    Ci.nsIEnvironment
-  );
-  return env.set(name, value);
-}
+let gShouldValidateUrl = null;
 
 // Return whether all tabs are automatically being recorded.
 function isRecordingAllTabs() {
@@ -185,7 +178,7 @@ class ProtocolSocket {
     const response = await new Promise(resolve => this._handlers.set(commandId, resolve));
 
     if (response.error) {
-      throw new CommandError(response.error.message, response.error.code);
+      throw new CommandError(response.error.message, response.error.code, response.error.data);
     }
 
     return response.result;
@@ -228,8 +221,15 @@ gCommandSocket.onStateChange = state => {
   }
 }
 
+// when the browser restarts itself (usually after an update), the
+// environment variables are retained. We want to ensure that this
+// variable doesn't contain an outdated token, so we clear it here
+// and rely on the initialization code in this file to set it again
+// if an API key or a current token is found.
+setenv("RECORD_REPLAY_AUTH", null);
 let gTokenChangeCallbacks = null;
 function setAccessToken(token, isAPIKey) {
+  setenv("RECORD_REPLAY_AUTH", token);
   gCommandSocket.setAccessToken(token);
 
   // If we're working with an API key, there's no way for us to get a new
@@ -286,9 +286,10 @@ async function sendCommand(method, params) {
 }
 
 class CommandError extends Error {
-  constructor(message, code) {
+  constructor(message, code, data) {
     super(message);
     this.code = code;
+    this.data = data;
   }
 }
 
@@ -308,6 +309,7 @@ function isLoggedIn() {
 
 async function saveRecordingToken(token) {
   ReplayAuth.setReplayUserToken(token);
+  gShouldValidateUrl = null;
 }
 
 function isRunningTest() {
@@ -365,7 +367,6 @@ if (ReplayAuth.hasOriginalApiKey()) {
       timeToExpiration
     );
 
-    setenv("RECORD_REPLAY_API_KEY", token);
     setAccessToken(token);
   }
 
@@ -425,6 +426,7 @@ class Recording extends EventEmitter {
         pingTelemetry("sourcemap-upload", "lock-exception", {
           message: err?.message,
           stack: err?.stack,
+          recordingId,
         });
         // We don't re-throw here because we can at worst let the resources upload
         // might still succeed in the background, it'll just be a race and the sourcemaps
@@ -434,7 +436,7 @@ class Recording extends EventEmitter {
     );
   }
 
-  _unlockRecording() {
+  _unlockRecording(recordingId) {
     if (!this._recordingResourcesUpload) {
       return;
     }
@@ -452,6 +454,7 @@ class Recording extends EventEmitter {
         pingTelemetry("sourcemap-upload", "unlock-exception", {
           message: err?.message,
           stack: err?.stack,
+          recordingId,
         });
       });
   }
@@ -465,6 +468,8 @@ class Recording extends EventEmitter {
       pingTelemetry("sourcemap-upload", "upload-exception", {
         message: err?.message,
         stack: err?.stack,
+        recordingId: params.recordingId,
+        commandErrorData: err instanceof CommandError ? err.data : undefined,
       });
     }));
   }
@@ -513,12 +518,12 @@ class Recording extends EventEmitter {
       // recording session without all the maps available.
       await Promise.all(this._resourceUploads);
     } finally {
-      this._unlockRecording();
+      this._unlockRecording(data.id);
     }
   }
 
   _onUnusable(data) {
-    this._unlockRecording();
+    this._unlockRecording(null);
 
     this.emit("unusable", data);
   }
@@ -527,6 +532,117 @@ class Recording extends EventEmitter {
     this.emit("unsupportedFeature", data);
   }
 }
+
+async function checkShouldValidateUrl() {
+  if (gShouldValidateUrl === null) {
+    const resp = await queryAPIServer(`
+      query GetOrgs {
+        viewer {
+          workspaces {
+            edges {
+              node {
+                isOrganization
+                settings {
+                  features
+                }
+              }
+            }
+          }
+        }
+      }
+    `);
+
+    if (resp.errors) {
+      throw new Error("Unexpected error checking Replay user permissions");
+    }
+
+    const workspaces = resp.data.viewer?.workspaces.edges;
+    gShouldValidateUrl = !workspaces ? false : workspaces.some(w => {
+      if (w.node.isOrganization) {
+        const {allowList, blockList} = w.node.settings?.features?.recording || {};
+
+        return (Array.isArray(allowList) && allowList.length > 0) || (Array.isArray(blockList) && blockList.length > 0);
+      }
+
+      return false;
+    });
+  }
+
+  return gShouldValidateUrl;
+}
+
+async function canRecordUrl(url) {
+  try {
+    const shouldValidate = await checkShouldValidateUrl();
+    if (!shouldValidate) return true;
+
+    const resp = await queryAPIServer(`
+      query CanRecord ($url: String!) {
+        viewer {
+          canRecordUrl(url: $url)
+        }
+      }
+    `, {
+      url
+    });
+
+    if (resp.errors) {
+      throw new Error(resp.errors[0].message);
+    }
+
+    return resp.data.viewer.canRecordUrl;
+  } catch (e) {
+    // Fallback to allowing recordings if the backend errors but log to telemetry
+    console.error(e);
+    pingTelemetry("recording", "can-record-failed", { why: e.message || "", url });
+
+    return true;
+  }
+}
+
+function getLocationListener(key) {
+  return {
+    key,
+    QueryInterface: ChromeUtils.generateQI([
+      "nsIWebProgressListener",
+      "nsISupportsWeakReference",
+    ]),
+    onLocationChange(aWebProgress, _, aLocation) {
+      if(!aWebProgress.isTopLevel) return;
+
+      // Always allow blank and new tab
+      if (aLocation.displaySpec === "about:blank" || aLocation.displaySpec === "https://app.replay.io/browser/new-tab") {
+        return;
+      }
+
+      canRecordUrl(aLocation.displaySpec).then((canRecord) => {
+        if (canRecord) return;
+
+        const browser = getRecordingBrowser(this.key);
+        const message = `The URL ${aLocation.displaySpec} may not be recorded according to your organization's policy.`;
+        showInvalidatedRecordingNotification(browser, message);
+        const remoteTab = browser.frameLoader.remoteTab;
+        if (remoteTab) {
+          remoteTab.finishRecording("Organization Policy Violation");
+        }
+      });
+    }
+  }
+}
+
+Services.obs.addObserver(
+  subject => {
+    const {state, entry, browser} = subject.wrappedJSObject;
+    if (browser && entry) {
+      if (state === RecordingState.STARTING) {
+        browser.addProgressListener(entry.locationListener);
+      } else if (state === RecordingState.READY) {
+        browser.removeProgressListener(entry.locationListener)
+      }
+    }
+  },
+  "recordreplay-recording-changed"
+);
 
 const RecordingState = {
   READY: 0,
@@ -547,13 +663,15 @@ function getRecordingBrowser(key) {
 
 function updateRecordingState(key, state) {
   const current = recordings.get(key);
+  const locationListener = current && current.locationListener || getLocationListener(key);
   const timestamps = current && current.timestamps || {};
   timestamps[state] = Date.now();
 
   const entry = {
     state,
     recording: current ? current.recording : null,
-    timestamps
+    timestamps,
+    locationListener,
   };
   recordings.set(key, entry);
   return entry;
@@ -568,14 +686,17 @@ function addRecordingInstance(key, recording) {
 }
 
 function setRecordingState(key, state) {
+  let entry = null;
   if (state === RecordingState.READY) {
+    entry = recordings.get(key);
     recordings.delete(key);
   } else {
-    updateRecordingState(key, state);
+    entry = updateRecordingState(key, state);
   }
 
   Services.obs.notifyObservers({
     browser: getRecordingBrowser(key),
+    entry,
     state
   }, "recordreplay-recording-changed");
 }
@@ -606,6 +727,10 @@ function remapRecordingState(browser, key) {
 
   if (recordings.has(key)) {
     const entry = recordings.get(key);
+    // Remap the key used by the listener so it can find the browser
+    if (entry.locationListener) {
+      entry.locationListener.key = newKey;
+    }
     recordings.delete(key);
     recordings.set(newKey, entry);
   }
@@ -764,9 +889,7 @@ function setRecordingFinished(browser, url) {
   SessionStore.setTabState(tab, state);
 
   if (url) {
-    browser.loadURI(url, {
-      triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
-    });
+    openInNewTab(browser, url);
   }
 
   remapRecordingState(browser, key);
@@ -896,10 +1019,38 @@ function handleRecordingStarted(pmm) {
   });
 }
 
+function showInvalidatedRecordingNotification(browser, message = `The current recording is not allowed by your organization's policy.`) {
+  const notificationBox = browser.getTabBrowser().getNotificationBox(browser);
+  let notification = notificationBox.getNotificationWithValue(
+    "replay-invalidated-recording"
+  );
+  if (notification) {
+    return;
+  }
+
+  notificationBox.appendNotification(
+    message,
+    "replay-invalidated-recording",
+    undefined,
+    notificationBox.PRIORITY_WARNING_HIGH,
+  );
+}
+
+function hideInvalidatedRecordingNotification(browser) {
+  const notificationBox = browser.getTabBrowser().getNotificationBox(browser);
+  const notification = notificationBox.getNotificationWithValue(
+    "replay-invalidated-recording"
+  );
+
+  if (notification) {
+    notificationBox.removeNotification(notification)
+  }
+}
+
 function showUnsupportedFeatureNotification(browser, feature, issueNumber) {
   const notificationBox = browser.getTabBrowser().getNotificationBox(browser);
   let notification = notificationBox.getNotificationWithValue(
-    "unsupported-feature"
+    "replay-unsupported-feature"
   );
   if (notification) {
     return;
@@ -909,7 +1060,7 @@ function showUnsupportedFeatureNotification(browser, feature, issueNumber) {
 
   notificationBox.appendNotification(
     message,
-    "unsupported-feature",
+    "replay-unsupported-feature",
     undefined,
     notificationBox.PRIORITY_WARNING_HIGH,
     [{
@@ -924,7 +1075,7 @@ function showUnsupportedFeatureNotification(browser, feature, issueNumber) {
 function hideUnsupportedFeatureNotification(browser) {
   const notificationBox = browser.getTabBrowser().getNotificationBox(browser);
   const notification = notificationBox.getNotificationWithValue(
-    "unsupported-feature"
+    "replay-unsupported-feature"
   );
 
   if (notification) {
@@ -1042,7 +1193,7 @@ function collectUnresolvedSourceMapResources(mapText, mapURL, mapBaseURL) {
   }
 
   function logError(msg) {
-    console.error(msg, mapURL, sourceOffset, sectionOffset);
+    console.error(msg, mapURL, sourceOffset);
   }
 
   const unresolvedSources = [];
@@ -1050,7 +1201,9 @@ function collectUnresolvedSourceMapResources(mapText, mapURL, mapBaseURL) {
 
   if (obj.version !== 3) {
     logError("Invalid sourcemap version");
-    return;
+    return {
+      sources: [],
+    };
   }
 
   if (obj.sources != null) {
