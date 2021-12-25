@@ -115,6 +115,9 @@ void ContentClient::Clear() { mBuffer = nullptr; }
 
 ContentClient::PaintState ContentClient::BeginPaint(PaintedLayer* aLayer,
                                                     uint32_t aFlags) {
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("ContentClient::BeginPaint Start");
+
   BufferDecision dest = CalculateBufferForPaint(aLayer, aFlags);
 
   PaintState result;
@@ -150,7 +153,11 @@ ContentClient::PaintState ContentClient::BeginPaint(PaintedLayer* aLayer,
 
   result.mRegionToDraw.Sub(dest.mNeededRegion, dest.mValidRegion);
 
-  if (result.mRegionToDraw.IsEmpty()) return result;
+  if (result.mRegionToDraw.IsEmpty()) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("ContentClient::BeginPaint #1");
+    return result;
+  }
 
   // We need to disable rotation if we're going to be resampled when
   // drawing, because we might sample across the rotation boundary.
@@ -246,6 +253,8 @@ ContentClient::PaintState ContentClient::BeginPaint(PaintedLayer* aLayer,
       }
       result.mAsyncTask = nullptr;
       Clear();
+      // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+      recordreplay::RecordReplayAssert("ContentClient::BeginPaint #2");
       return result;
     }
 
@@ -253,6 +262,8 @@ ContentClient::PaintState ContentClient::BeginPaint(PaintedLayer* aLayer,
       gfxCriticalNote << "Failed to lock new back buffer.";
       result.mAsyncTask = nullptr;
       Clear();
+      // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+      recordreplay::RecordReplayAssert("ContentClient::BeginPaint #3");
       return result;
     }
 
@@ -299,6 +310,8 @@ ContentClient::PaintState ContentClient::BeginPaint(PaintedLayer* aLayer,
   result.mClip = DrawRegionClip::DRAW;
   result.mMode = dest.mBufferMode;
 
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("ContentClient::BeginPaint Done");
   return result;
 }
 
