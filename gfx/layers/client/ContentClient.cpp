@@ -628,6 +628,9 @@ void ContentClientRemoteBuffer::EndPaint(
 
 RefPtr<RotatedBuffer> ContentClientRemoteBuffer::CreateBuffer(
     gfxContentType aType, const IntRect& aRect, uint32_t aFlags) {
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("ContentClientRemoteBuffer::CreateBuffer Start");
+
   // If we hit this assertion, then it might be due to an empty transaction
   // followed by a real transaction. Our buffers should be created (but not
   // painted in the empty transaction) and then painted (but not created) in the
@@ -649,12 +652,16 @@ RefPtr<RotatedBuffer> ContentClientRemoteBuffer::CreateBuffer(
       CreateBufferInternal(aRect, format, textureFlags);
 
   if (!buffer) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("ContentClientRemoteBuffer::CreateBuffer #1");
     return nullptr;
   }
 
   mIsNewBuffer = true;
   mTextureFlags = textureFlags;
 
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("ContentClientRemoteBuffer::CreateBuffer Done");
   return buffer;
 }
 

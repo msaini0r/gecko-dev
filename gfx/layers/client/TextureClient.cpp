@@ -1195,16 +1195,23 @@ already_AddRefed<TextureClient> TextureClient::CreateForDrawing(
     gfx::IntSize aSize, KnowsCompositor* aKnowsCompositor,
     BackendSelector aSelector, TextureFlags aTextureFlags,
     TextureAllocationFlags aAllocFlags) {
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("TextureClient::CreateForDrawing Start");
+
   LayersBackend layersBackend = aKnowsCompositor->GetCompositorBackendType();
   gfx::BackendType moz2DBackend =
       BackendTypeForBackendSelector(layersBackend, aSelector);
 
   // also test the validity of aAllocator
   if (!aAllocator || !aAllocator->IPCOpen()) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("TextureClient::CreateForDrawing #1");
     return nullptr;
   }
 
   if (!gfx::Factory::AllowedSurfaceSize(aSize)) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("TextureClient::CreateForDrawing #2");
     return nullptr;
   }
 
@@ -1213,6 +1220,8 @@ already_AddRefed<TextureClient> TextureClient::CreateForDrawing(
                           aSelector, aTextureFlags, aAllocFlags);
 
   if (data) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("TextureClient::CreateForDrawing #3");
     return MakeAndAddRef<TextureClient>(data, aTextureFlags, aAllocator);
   }
 
@@ -1311,16 +1320,25 @@ already_AddRefed<TextureClient> TextureClient::CreateForRawBufferAccess(
     gfx::IntSize aSize, gfx::BackendType aMoz2DBackend,
     LayersBackend aLayersBackend, TextureFlags aTextureFlags,
     TextureAllocationFlags aAllocFlags) {
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess Start");
+
   // also test the validity of aAllocator
   if (!aAllocator || !aAllocator->IPCOpen()) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess #1");
     return nullptr;
   }
 
   if (aAllocFlags & ALLOC_DISALLOW_BUFFERTEXTURECLIENT) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess #2");
     return nullptr;
   }
 
   if (!gfx::Factory::AllowedSurfaceSize(aSize)) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess #3");
     return nullptr;
   }
 
@@ -1338,12 +1356,18 @@ already_AddRefed<TextureClient> TextureClient::CreateForRawBufferAccess(
                            aMoz2DBackend == gfx::BackendType::DIRECT2D1_1,
                        "Unsupported TextureClient backend type");
 
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess #4");
+
   TextureData* texData = BufferTextureData::Create(
       aSize, aFormat, gfx::BackendType::SKIA, aLayersBackend, aTextureFlags,
       aAllocFlags, aAllocator);
   if (!texData) {
     return nullptr;
   }
+
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess #5");
 
   return MakeAndAddRef<TextureClient>(texData, aTextureFlags, aAllocator);
 }
