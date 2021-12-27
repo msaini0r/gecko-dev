@@ -120,6 +120,9 @@ ContentClient::PaintState ContentClient::BeginPaint(PaintedLayer* aLayer,
 
   BufferDecision dest = CalculateBufferForPaint(aLayer, aFlags);
 
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("ContentClient::BeginPaint #X1 %d", dest.mCanReuseBuffer);
+
   PaintState result;
   result.mAsyncPaint = (aFlags & PAINT_ASYNC);
   result.mContentType = dest.mBufferContentType;
@@ -178,9 +181,15 @@ ContentClient::PaintState ContentClient::BeginPaint(PaintedLayer* aLayer,
     result.mAsyncTask.reset(new PaintTask());
   }
 
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("ContentClient::BeginPaint #X2 %d %d", !!mBuffer, dest.mCanReuseBuffer);
+
   // Try to acquire the back buffer, copy over contents if we are using a new
   // buffer, and rotate or unrotate the buffer as necessary
   if (mBuffer && dest.mCanReuseBuffer) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("ContentClient::BeginPaint #X2.1");
+
     if (mBuffer->Lock(writeMode)) {
       auto newParameters = mBuffer->AdjustedParameters(dest.mBufferRect);
 
@@ -212,6 +221,10 @@ ContentClient::PaintState ContentClient::BeginPaint(PaintedLayer* aLayer,
         } else {
           MOZ_ASSERT(GetFrontBuffer());
           mBuffer->Unlock();
+
+          // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+          recordreplay::RecordReplayAssert("ContentClient::BeginPaint #X3");
+
           dest.mBufferRect = ComputeBufferRect(dest.mNeededRegion.GetBounds());
           dest.mCanReuseBuffer = false;
         }
@@ -219,6 +232,9 @@ ContentClient::PaintState ContentClient::BeginPaint(PaintedLayer* aLayer,
         mBuffer->SetParameters(newParameters);
       }
     } else {
+      // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+      recordreplay::RecordReplayAssert("ContentClient::BeginPaint #X4");
+
       result.mRegionToDraw = dest.mNeededRegion;
       dest.mCanReuseBuffer = false;
       Clear();
@@ -230,6 +246,9 @@ ContentClient::PaintState ContentClient::BeginPaint(PaintedLayer* aLayer,
   NS_ASSERTION(!(aFlags & PAINT_WILL_RESAMPLE) ||
                    dest.mBufferRect == dest.mNeededRegion.GetBounds(),
                "If we're resampling, we need to validate the entire buffer");
+
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("ContentClient::BeginPaint #10 %d", dest.mCanReuseBuffer);
 
   // We never had a buffer, the buffer wasn't big enough, the content changed
   // types, or we failed to unrotate the buffer when requested. In any case,
