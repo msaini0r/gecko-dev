@@ -615,19 +615,31 @@ bool TextureClient::IsReadLocked() const {
 }
 
 bool TextureClient::TryReadLock() {
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("TextureClient::TryReadLock Start");
+
   if (!mReadLock || mIsReadLocked) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("TextureClient::TryReadLock #1");
     return true;
   }
 
   if (mReadLock->AsNonBlockingLock()) {
     if (IsReadLocked()) {
+      // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+      recordreplay::RecordReplayAssert("TextureClient::TryReadLock #2");
       return false;
     }
   }
 
   if (!mReadLock->TryReadLock(TimeDuration::FromMilliseconds(500))) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("TextureClient::TryReadLock #3");
     return false;
   }
+
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("TextureClient::TryReadLock Done");
 
   mIsReadLocked = true;
   return true;
@@ -645,10 +657,18 @@ void TextureClient::ReadUnlock() {
 bool TextureClient::Lock(OpenMode aMode) {
   MOZ_ASSERT(IsValid());
   MOZ_ASSERT(!mIsLocked);
+
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("TextureClient::Lock Start");
+
   if (!IsValid()) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("TextureClient::Lock #1");
     return false;
   }
   if (mIsLocked) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("TextureClient::Lock #2 %d %d", (int)mOpenMode, (int)aMode);
     return mOpenMode == aMode;
   }
 
@@ -659,6 +679,8 @@ bool TextureClient::Lock(OpenMode aMode) {
       NS_WARNING(
           "Attempt to Lock a texture that is being read by the compositor!");
     }
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+    recordreplay::RecordReplayAssert("TextureClient::Lock #3");
     return false;
   }
 
@@ -680,6 +702,8 @@ bool TextureClient::Lock(OpenMode aMode) {
       // Failed to get a DrawTarget, means we won't be able to write into the
       // texture, might as well fail now.
       Unlock();
+      // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+      recordreplay::RecordReplayAssert("TextureClient::Lock #4");
       return false;
     }
   }
@@ -689,6 +713,8 @@ bool TextureClient::Lock(OpenMode aMode) {
     ReadUnlock();
   }
 
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
+  recordreplay::RecordReplayAssert("TextureClient::Done %d", (int)mIsLocked);
   return mIsLocked;
 }
 
