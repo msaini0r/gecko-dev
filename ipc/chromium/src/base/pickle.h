@@ -82,6 +82,9 @@ class Pickle {
   // Returns the size of the Pickle's data.
   uint32_t size() const { return header_size_ + header_->payload_size; }
 
+  // Returns the size of the Pickle's header, which will not be iterated over.
+  uint32_t header_size() const { return header_size_; }
+
   typedef mozilla::BufferList<InfallibleAllocPolicy> BufferList;
 
   const BufferList& Buffers() const { return buffers_; }

@@ -103,8 +103,41 @@ void PortLink::SendMessage(UniquePtr<Message> aMessage) {
 
   // Check that messages sent over IPC channels have consistent contents when
   // recording vs. replaying.
-  mozilla::recordreplay::RecordReplayAssert("PortLink::SendMessage %d %d %u",
-                                            aMessage->type(), aMessage->routing_id(), aMessage->size());
+  recordreplay::RecordReplayAssert("PortLink::SendMessage %d %d %u",
+                                   aMessage->type(), aMessage->routing_id(), aMessage->size());
+
+  // When replaying message sizes must be consistent, or we'll crash when trying
+  // to send the messages because we'll get unexpected data from system calls
+  // which are being replayed. To improve robustness, force messages to be the
+  // same size when replaying by padding or truncating them.
+  size_t recordedSize = recordreplay::RecordReplayValue("PortLink::SendMessage", aMessage->size());
+  if (recordedSize != aMessage->size()) {
+    recordreplay::AutoPassThroughThreadEvents pt;
+    recordreplay::Diagnostic("PortLink::SendMessage resizing message from %zu to %zu",
+                             aMessage->size(), recordedSize);
+    if (recordedSize < aMessage->size()) {
+      PickleIterator iter(*aMessage);
+      // The total size includes the header which the iterator skips past,
+      // so correct for this difference.
+      MOZ_RELEASE_ASSERT(recordedSize >= aMessage->header_size());
+      if (!aMessage->IgnoreBytes(&iter, recordedSize - aMessage->header_size())) {
+        MOZ_CRASH("PortLink::SendMessage resize IgnoreBytes failed");
+      }
+      aMessage->Truncate(&iter);
+    } else {
+      size_t paddingSize = recordedSize - aMessage->size();
+      char* padding = new char[paddingSize];
+      memset(padding, 0, paddingSize);
+      if (!aMessage->WriteBytes(padding, paddingSize)) {
+        MOZ_CRASH("PortLink::SendMessage resize WriteBytes failed");
+      }
+      delete[] padding;
+    }
+    if (recordedSize != aMessage->size()) {
+      recordreplay::Diagnostic("PortLink::SendMessage resize failed, size is %zu", aMessage->size());
+      MOZ_CRASH("PortLink::SendMessage");
+    }
+  }
 
   if (aMessage->size() > IPC::Channel::kMaximumMessageSize) {
     CrashReporter::AnnotateCrashReport(
