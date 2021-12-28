@@ -1629,13 +1629,26 @@ class CrossProcessSemaphoreReadLock : public TextureReadLock {
     if (!IsValid()) {
       return false;
     }
-    return mSemaphore->Wait();
+    // The behavior of semaphores used across processes is not currently recorded/replayed,
+    // similar to accesses on shared memory objects. Similar to shared memory read locks,
+    // manually record/replay the semaphore behavior.
+    if (recordreplay::IsReplaying()) {
+      // Note: Use a default value of "true" here when diverged from the recording.
+      return recordreplay::RecordReplayValue("CrossProcessSemaphoreReadLock::ReadLock", true);
+    }
+    return recordreplay::RecordReplayValue("CrossProcessSemaphoreReadLock::ReadLock",
+                                           mSemaphore->Wait());
   }
   bool TryReadLock(TimeDuration aTimeout) override {
     if (!IsValid()) {
       return false;
     }
-    return mSemaphore->Wait(Some(aTimeout));
+    // Manually record/replay semaphore behavior, as above.
+    if (recordreplay::IsReplaying()) {
+      return recordreplay::RecordReplayValue("CrossProcessSemaphoreReadLock::TryReadLock", true);
+    }
+    return recordreplay::RecordReplayValue("CrossProcessSemaphoreReadLock::TryReadLock",
+                                           mSemaphore->Wait(Some(aTimeout)));
   }
   int32_t ReadUnlock() override {
     if (!IsValid()) {
