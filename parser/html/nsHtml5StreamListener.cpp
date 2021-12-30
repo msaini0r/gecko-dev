@@ -17,7 +17,7 @@ NS_INTERFACE_MAP_BEGIN(nsHtml5StreamListener)
 NS_INTERFACE_MAP_END
 
 nsHtml5StreamListener::nsHtml5StreamListener(nsHtml5StreamParser* aDelegate)
-    : mDelegateMonitor("nsHtml5StreamListener mDelegateMonitor"),
+    : mDelegateMonitor("nsHtml5StreamListener mDelegateMonitor", /* aOrdered */ true),
       mDelegate(aDelegate) {
   MOZ_ASSERT(aDelegate, "Must have delegate");
   aDelegate->AddRef();
