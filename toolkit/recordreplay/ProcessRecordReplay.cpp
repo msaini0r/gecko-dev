@@ -750,7 +750,7 @@ static bool FilterMatches(const InfallibleVector<JSFilter>& aFilters,
 }
 
 const char* CurrentFirefoxVersion() {
-  return "86.0";
+  return "91.0";
 }
 
 static bool gHasCheckpoint = false;
