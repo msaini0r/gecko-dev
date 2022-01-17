@@ -43,6 +43,8 @@ const {
   "resource://devtools/server/actors/replay/network-helpers.jsm"
 );
 
+const { NetUtil } = ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
+
 const { ComponentUtils } = ChromeUtils.import("resource://gre/modules/ComponentUtils.jsm");
 
 const { require } = ChromeUtils.import("resource://devtools/shared/Loader.jsm");
@@ -644,6 +646,7 @@ const commands = {
   "Target.getSheetSourceMapURL": Target_getSheetSourceMapURL,
   "Target.topFrameLocation": Target_topFrameLocation,
   "Target.getCurrentNetworkRequestEvent": Target_getCurrentNetworkRequestEvent,
+  "Target.getCurrentNetworkStreamData": Target_getCurrentNetworkStreamData,
 };
 
 function OnProtocolCommand(method, params) {
@@ -1106,6 +1109,71 @@ if (isRecordingOrReplaying) {
     return channel;
   }
 
+  function onRequestStreamTopic(subject, topic, data) {
+    const inputStream = subject.QueryInterface(Ci.nsIInputStream);
+    const channelId = +data;
+    const isRequestBody = topic === "replay-request-start";
+
+    const streamId = `${isRequestBody ? "request" : "response"}-${channelId}`;
+    notifyRequestEvent(channelId, isRequestBody ? "request-body" : "response-body", {});
+    notifyNetworkStreamStart(streamId, isRequestBody ? "request-data" : "response-data", `${channelId}`);
+
+    let offset = 0;
+    listenForStreamData();
+
+    function onStreamData(value) {
+      notifyNetworkStreamData(streamId, offset, value.byteLength, ({ index, length }) => ({
+        kind: "data",
+        value: ChromeUtils.base64URLEncode(
+          value.slice(index, index + length),
+          { pad: true }
+        ).replace(/-/g, "+").replace(/_/g, "/"),
+      }));
+
+      offset += value.byteLength;
+    }
+
+    function onStreamEnd() {
+      notifyNetworkStreamEnd(streamId, offset);
+    }
+
+    function listenForStreamData() {
+      inputStream.asyncWait({ onInputStreamReady }, 0, 0, Services.tm.mainThread);
+    }
+
+    function onInputStreamReady(stream) {
+      assert(stream === inputStream);
+
+      let available;
+      try {
+        available = inputStream.available();
+      } catch {
+        onStreamEnd();
+        return;
+      }
+
+      if (available > 0) {
+        const value = NetUtil.readInputStream(inputStream, available);
+        onStreamData(value);
+      }
+
+      // For some reason, request streams don't appear to be marked closed properly.
+      // Firefox doesn't support using an actual ReadableStream for fetch bodies,
+      // so every request body SHOULD have all of its data available immediately,
+      // meaning that we can immediately consider all request body streams to
+      // end once they have been read.
+      if (isRequestBody) {
+        onStreamEnd();
+        stream.close();
+        return;
+      }
+
+      listenForStreamData();
+    }
+  }
+  Services.obs.addObserver(onRequestStreamTopic, "replay-request-start");
+  Services.obs.addObserver(onRequestStreamTopic, "replay-response-start");
+
   Services.obs.addObserver((subject, topic, data) => {
     const channel = getChannel(subject);
     if (!channel) {
@@ -1285,6 +1353,18 @@ if (isRecordingOrReplaying) {
     false,
     true
   );
+
+  function notifyNetworkStreamStart(id, kind, parentId) {
+    RecordReplayControl.onNetworkStreamStart(id, kind, parentId);
+  }
+  function notifyNetworkStreamData(id, offset, length, callback) {
+    gCurrentNetworkStreamDataCallback = callback;
+    RecordReplayControl.onNetworkStreamData(id, offset, length);
+    gCurrentNetworkStreamDataCallback = null;
+  }
+  function notifyNetworkStreamEnd(id, length) {
+    RecordReplayControl.onNetworkStreamEnd(id, length);
+  }
 }
 
 
@@ -2176,6 +2256,15 @@ function Pause_getTopFrame() {
     return { frame: id, data: { frames: [frameData] } };
   }
   return { data: {} };
+}
+
+let gCurrentNetworkStreamDataCallback;
+
+function Target_getCurrentNetworkStreamData(params) {
+  assert(gCurrentNetworkStreamDataCallback, "must have network stream data");
+  return {
+    data: gCurrentNetworkStreamDataCallback(params),
+  };
 }
 
 function Target_getCurrentNetworkRequestEvent() {

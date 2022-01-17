@@ -1,10 +1,14 @@
-name: Release Latest Browsers
+name: Set Idle Testing Branch
 on:
   workflow_dispatch:
+    inputs:
+      driver_revision:
+        description: "Driver revision to use, if not the latest"
+        required: false
 
 jobs:
-  release:
-    name: Trigger release run
+  idle-test:
+    name: Set idle testing revision to current branch
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -13,12 +17,7 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_API_KEY }}
       - uses: actions/checkout@v2
-        with:
-          ref: replay-playwright
-      - uses: actions/checkout@v2
-        with:
-          ref: webreplay-release
-      - uses: ./.github/actions/release
+      - uses: ./.github/actions/set-idle-testing
         env:
           BUILD_TEST_AUTHORIZATION: ${{ secrets.BUILD_TEST_AUTHORIZATION }}
           BUILD_TEST_HOSTNAME: build-server.replay.prod

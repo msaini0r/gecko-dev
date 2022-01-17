@@ -42,12 +42,13 @@ const {
   getRecordingState,
   RecordingState,
   isLoggedIn,
-  saveRecordingToken,
   isRunningTest,
 } = ChromeUtils.import(
   "resource://devtools/server/actors/replay/connection.js"
 );
-
+const { openSigninPage } = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/auth.js"
+);
 const { pingTelemetry } = ChromeUtils.import(
   "resource://devtools/server/actors/replay/telemetry.js"
 );
@@ -632,7 +633,6 @@ DevToolsStartup.prototype = {
       return;
     }
     this.recordingButtonCreated = true;
-    this.initializeRecordingWebChannel();
 
     createRecordingButton();
   },
@@ -736,25 +736,6 @@ DevToolsStartup.prototype = {
     }
   },
 
-  initializeRecordingWebChannel() {
-    const pageUrl = Services.prefs.getStringPref(
-      "devtools.recordreplay.recordingsUrl"
-    );
-    const localUrl = "http://localhost:8080/view";
-
-    registerWebChannel(pageUrl);
-    registerWebChannel(localUrl);
-
-    function registerWebChannel(url) {
-      const urlForWebChannel = Services.io.newURI(url);
-      const channel = new WebChannel("record-replay-token", urlForWebChannel);
-
-      channel.listen((id, message) => {
-        const { token } = message;
-        saveRecordingToken(token);
-      });
-    }
-  },
   /*
    * We listen to the "Web Developer" system menu, which is under "Tools" main item.
    * This menu item is hardcoded empty in Firefox UI. We listen for its opening to
@@ -1426,7 +1407,7 @@ function createRecordingButton() {
       const { selectedBrowser } = node.ownerDocument.defaultView.gBrowser;
       if (!isLoggedIn()) {
         pingTelemetry("browser", "recording-button-click-while-logged-out");
-        openSigninPage(selectedBrowser);
+        pickSigninPage(selectedBrowser);
         return;
       }
 
@@ -1480,7 +1461,7 @@ function createRecordingButton() {
     type: "button",
     tooltiptext: "replay-signin-button.tooltiptext2",
     onClick(evt) {
-      openSigninPage(evt.target.ownerDocument.defaultView.gBrowser);
+      pickSigninPage(evt.target.ownerDocument.defaultView.gBrowser);
     },
     onCreated(node) {
       node.refreshStatus = () => {
@@ -1502,7 +1483,14 @@ function createRecordingButton() {
   });
 }
 
-function openSigninPage(gBrowser) {
+function pickSigninPage(gBrowser) {
+  const externalAuthFlow = Services.prefs.getBoolPref("devtools.recordreplay.ext-auth", false);
+
+  if (externalAuthFlow) {
+    openSigninPage();
+    return;
+  }
+
   const url = "https://app.replay.io/?signin=true";
   const options = { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() };
 

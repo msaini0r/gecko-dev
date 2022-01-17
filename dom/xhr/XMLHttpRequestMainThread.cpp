@@ -43,6 +43,7 @@
 #include "mozilla/StaticPrefs_dom.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/StaticPrefs_privacy.h"
+#include "mozilla/RecordReplay.h"
 #include "mozilla/dom/ProgressEvent.h"
 #include "nsIJARChannel.h"
 #include "nsIJARURI.h"
@@ -2534,7 +2535,7 @@ nsresult XMLHttpRequestMainThread::InitiateFetch(
       // 'this'. Make sure to hold a strong reference so that we don't leak the
       // wrapper.
       nsCOMPtr<nsIStreamListener> listener =
-          new net::nsStreamListenerWrapper(this);
+          recordreplay::WrapNetworkStreamListener(new net::nsStreamListenerWrapper(this));
       rv = preload->AsyncConsume(listener);
       if (NS_SUCCEEDED(rv)) {
         mFromPreload = true;
@@ -2599,6 +2600,10 @@ nsresult XMLHttpRequestMainThread::InitiateFetch(
     }
 
     if (uploadStream) {
+      if (httpChannel) {
+        uploadStream = recordreplay::WrapNetworkRequestBodyStream(httpChannel, uploadStream);
+      }
+
       // If necessary, wrap the stream in a buffered stream so as to guarantee
       // support for our upload when calling ExplicitSetUploadStream.
       if (!NS_InputStreamIsBuffered(uploadStream)) {
@@ -2714,7 +2719,7 @@ nsresult XMLHttpRequestMainThread::InitiateFetch(
   // Because of bug 682305, we can't let listener be the XHR object itself
   // because JS wouldn't be able to use it. So create a listener around 'this'.
   // Make sure to hold a strong reference so that we don't leak the wrapper.
-  nsCOMPtr<nsIStreamListener> listener = new net::nsStreamListenerWrapper(this);
+  nsCOMPtr<nsIStreamListener> listener = recordreplay::WrapNetworkStreamListener(new net::nsStreamListenerWrapper(this));
 
   // Check if this XHR is created from a tracking script.
   // If yes, lower the channel's priority.

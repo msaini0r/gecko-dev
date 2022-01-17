@@ -9,6 +9,7 @@
 #ifndef mozilla_RecordReplay_h
 #define mozilla_RecordReplay_h
 
+#include "mozilla/AlreadyAddRefed.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/TemplateLib.h"
@@ -18,6 +19,9 @@
 #include <functional>
 #include <stdarg.h>
 
+class nsIHttpChannel;
+class nsIInputStream;
+class nsIStreamListener;
 class nsIURI;
 
 namespace mozilla {
@@ -347,6 +351,15 @@ uint32_t LookupStableHashCode(const void* aTable, const void* aKey, uint32_t aUn
 void StableHashTableAddEntryForLastLookup(const void* aTable, const void* aEntry);
 void StableHashTableMoveEntry(const void* aTable, const void* aEntrySrc, const void* aEntryDst);
 void StableHashTableDeleteEntry(const void* aTable, const void* aEntry);
+
+// Wrap a given stream listener to emit an observer notification when the stream
+// begins and allow observation of a tee stream.
+already_AddRefed<nsIStreamListener> WrapNetworkStreamListener(nsIStreamListener* aListener);
+
+// Wrap a given request input stream to emit an observer notification when the stream
+// begins and allow observation of a tee stream.
+already_AddRefed<nsIInputStream> WrapNetworkRequestBodyStream(nsIHttpChannel* aChannel,
+                                                              nsIInputStream* aStream);
 
 ///////////////////////////////////////////////////////////////////////////////
 // API inline function implementation
