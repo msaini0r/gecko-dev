@@ -122,8 +122,6 @@ BufferTextureData* BufferTextureData::Create(
     gfx::BackendType aMoz2DBackend, LayersBackend aLayersBackend,
     TextureFlags aFlags, TextureAllocationFlags aAllocFlags,
     mozilla::ipc::IShmemAllocator* aAllocator, bool aIsSameProcess) {
-  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-  recordreplay::RecordReplayAssert("BufferTextureData::Create %d %d", !!aAllocator, aIsSameProcess);
   if (!aAllocator || aIsSameProcess) {
     return MemoryTextureData::Create(aSize, aFormat, aMoz2DBackend,
                                      aLayersBackend, aFlags, aAllocFlags,

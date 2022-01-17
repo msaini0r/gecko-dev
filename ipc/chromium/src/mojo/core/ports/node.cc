@@ -207,12 +207,6 @@ int Node::SetUserData(const PortRef& port_ref, RefPtr<UserData> user_data) {
 int Node::GetUserData(const PortRef& port_ref, RefPtr<UserData>* user_data) {
   SinglePortLocker locker(&port_ref);
   auto* port = locker.port();
-
-  // https://github.com/RecordReplay/backend/issues/3826
-  mozilla::recordreplay::RecordReplayAssert("Node::GetUserData %zu %d %d",
-                                            mozilla::recordreplay::ThingIndex(port),
-                                            (int)port->state, !!port->user_data);
-
   if (port->state == Port::kClosed) {
     return ERROR_PORT_STATE_UNEXPECTED;
   }

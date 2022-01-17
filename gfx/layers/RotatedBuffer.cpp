@@ -384,15 +384,10 @@ bool RemoteRotatedBuffer::Lock(OpenMode aMode) {
   MOZ_ASSERT(!mTarget);
   MOZ_ASSERT(!mTargetOnWhite);
 
-  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-  recordreplay::RecordReplayAssert("RemoteRotatedBuffer::Lock Start %d", !!mClientOnWhite);
-
   bool locked =
       mClient->Lock(aMode) && (!mClientOnWhite || mClientOnWhite->Lock(aMode));
   if (!locked) {
     Unlock();
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("RemoteRotatedBuffer::Lock #1");
     return false;
   }
 
@@ -401,8 +396,6 @@ bool RemoteRotatedBuffer::Lock(OpenMode aMode) {
     gfxCriticalNote << "Invalid draw target " << hexa(mTarget)
                     << " in RemoteRotatedBuffer::Lock";
     Unlock();
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("RemoteRotatedBuffer::Lock #2");
     return false;
   }
 
@@ -413,8 +406,6 @@ bool RemoteRotatedBuffer::Lock(OpenMode aMode) {
                       << hexa(mTargetOnWhite)
                       << " in RemoteRotatedBuffer::Lock";
       Unlock();
-      // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-      recordreplay::RecordReplayAssert("RemoteRotatedBuffer::Lock #3");
       return false;
     }
   }
@@ -426,16 +417,12 @@ bool RemoteRotatedBuffer::Lock(OpenMode aMode) {
       gfxCriticalNote << "Invalid dual draw target " << hexa(mTargetDual)
                       << " in RemoteRotatedBuffer::Lock";
       Unlock();
-      // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-      recordreplay::RecordReplayAssert("RemoteRotatedBuffer::Lock #4");
       return false;
     }
   } else {
     mTargetDual = mTarget;
   }
 
-  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-  recordreplay::RecordReplayAssert("RemoteRotatedBuffer::Lock Done");
   return true;
 }
 

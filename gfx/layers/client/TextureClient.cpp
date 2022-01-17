@@ -615,31 +615,19 @@ bool TextureClient::IsReadLocked() const {
 }
 
 bool TextureClient::TryReadLock() {
-  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-  recordreplay::RecordReplayAssert("TextureClient::TryReadLock Start");
-
   if (!mReadLock || mIsReadLocked) {
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("TextureClient::TryReadLock #1");
     return true;
   }
 
   if (mReadLock->AsNonBlockingLock()) {
     if (IsReadLocked()) {
-      // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-      recordreplay::RecordReplayAssert("TextureClient::TryReadLock #2");
       return false;
     }
   }
 
   if (!mReadLock->TryReadLock(TimeDuration::FromMilliseconds(500))) {
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("TextureClient::TryReadLock #3");
     return false;
   }
-
-  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-  recordreplay::RecordReplayAssert("TextureClient::TryReadLock Done");
 
   mIsReadLocked = true;
   return true;
@@ -657,18 +645,10 @@ void TextureClient::ReadUnlock() {
 bool TextureClient::Lock(OpenMode aMode) {
   MOZ_ASSERT(IsValid());
   MOZ_ASSERT(!mIsLocked);
-
-  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-  recordreplay::RecordReplayAssert("TextureClient::Lock Start");
-
   if (!IsValid()) {
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("TextureClient::Lock #1");
     return false;
   }
   if (mIsLocked) {
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("TextureClient::Lock #2 %d %d", (int)mOpenMode, (int)aMode);
     return mOpenMode == aMode;
   }
 
@@ -679,8 +659,6 @@ bool TextureClient::Lock(OpenMode aMode) {
       NS_WARNING(
           "Attempt to Lock a texture that is being read by the compositor!");
     }
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("TextureClient::Lock #3");
     return false;
   }
 
@@ -702,8 +680,6 @@ bool TextureClient::Lock(OpenMode aMode) {
       // Failed to get a DrawTarget, means we won't be able to write into the
       // texture, might as well fail now.
       Unlock();
-      // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-      recordreplay::RecordReplayAssert("TextureClient::Lock #4");
       return false;
     }
   }
@@ -713,8 +689,6 @@ bool TextureClient::Lock(OpenMode aMode) {
     ReadUnlock();
   }
 
-  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-  recordreplay::RecordReplayAssert("TextureClient::Done %d", (int)mIsLocked);
   return mIsLocked;
 }
 
@@ -1221,23 +1195,16 @@ already_AddRefed<TextureClient> TextureClient::CreateForDrawing(
     gfx::IntSize aSize, KnowsCompositor* aKnowsCompositor,
     BackendSelector aSelector, TextureFlags aTextureFlags,
     TextureAllocationFlags aAllocFlags) {
-  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-  recordreplay::RecordReplayAssert("TextureClient::CreateForDrawing Start");
-
   LayersBackend layersBackend = aKnowsCompositor->GetCompositorBackendType();
   gfx::BackendType moz2DBackend =
       BackendTypeForBackendSelector(layersBackend, aSelector);
 
   // also test the validity of aAllocator
   if (!aAllocator || !aAllocator->IPCOpen()) {
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("TextureClient::CreateForDrawing #1");
     return nullptr;
   }
 
   if (!gfx::Factory::AllowedSurfaceSize(aSize)) {
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("TextureClient::CreateForDrawing #2");
     return nullptr;
   }
 
@@ -1246,8 +1213,6 @@ already_AddRefed<TextureClient> TextureClient::CreateForDrawing(
                           aSelector, aTextureFlags, aAllocFlags);
 
   if (data) {
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("TextureClient::CreateForDrawing #3");
     return MakeAndAddRef<TextureClient>(data, aTextureFlags, aAllocator);
   }
 
@@ -1346,25 +1311,16 @@ already_AddRefed<TextureClient> TextureClient::CreateForRawBufferAccess(
     gfx::IntSize aSize, gfx::BackendType aMoz2DBackend,
     LayersBackend aLayersBackend, TextureFlags aTextureFlags,
     TextureAllocationFlags aAllocFlags) {
-  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-  recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess Start");
-
   // also test the validity of aAllocator
   if (!aAllocator || !aAllocator->IPCOpen()) {
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess #1");
     return nullptr;
   }
 
   if (aAllocFlags & ALLOC_DISALLOW_BUFFERTEXTURECLIENT) {
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess #2");
     return nullptr;
   }
 
   if (!gfx::Factory::AllowedSurfaceSize(aSize)) {
-    // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-    recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess #3");
     return nullptr;
   }
 
@@ -1382,18 +1338,12 @@ already_AddRefed<TextureClient> TextureClient::CreateForRawBufferAccess(
                            aMoz2DBackend == gfx::BackendType::DIRECT2D1_1,
                        "Unsupported TextureClient backend type");
 
-  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-  recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess #4");
-
   TextureData* texData = BufferTextureData::Create(
       aSize, aFormat, gfx::BackendType::SKIA, aLayersBackend, aTextureFlags,
       aAllocFlags, aAllocator);
   if (!texData) {
     return nullptr;
   }
-
-  // Diagnostic for https://github.com/RecordReplay/backend/issues/4050
-  recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess #5");
 
   return MakeAndAddRef<TextureClient>(texData, aTextureFlags, aAllocator);
 }

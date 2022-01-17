@@ -340,18 +340,12 @@ void NodeController::PortStatusChanged(const PortRef& aPortRef) {
                            ToString(aPortRef.name()).c_str());
     return;
   }
-  // https://github.com/RecordReplay/backend/issues/3826
-  recordreplay::RecordReplayAssert("NodeController::PortStatusChanged #2");
   if (userData) {
-    // https://github.com/RecordReplay/backend/issues/3826
-    recordreplay::RecordReplayAssert("NodeController::PortStatusChanged #3");
     // All instances of `UserData` attached to ports in this node must be of
     // type `PortObserver`, so we can call `OnPortStatusChanged` directly on
     // them.
     static_cast<PortObserver*>(userData.get())->OnPortStatusChanged();
   }
-  // https://github.com/RecordReplay/backend/issues/3826
-  recordreplay::RecordReplayAssert("NodeController::PortStatusChanged Done");
 }
 
 void NodeController::OnEventMessage(const NodeName& aFromNode,

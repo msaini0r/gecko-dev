@@ -529,11 +529,6 @@ gfxFloat gfxDWriteFont::MeasureGlyphWidth(uint16_t aGlyph) {
           return advance * mFUnitsConvFactor;
         }
       } else {
-        // Diagnostic for https://github.com/RecordReplay/backend/issues/3826
-        mozilla::recordreplay::RecordReplayAssert("gfxDWriteFont::MeasureGlyphWidth #1 %.2f %d %u",
-                                                  FLOAT(mAdjustedSize),
-                                                  GetMeasuringMode() == DWRITE_MEASURING_MODE_GDI_NATURAL,
-                                                  aGlyph);
         hr = mFontFace1->GetGdiCompatibleGlyphAdvances(
             FLOAT(mAdjustedSize), 1.0f, nullptr,
             GetMeasuringMode() == DWRITE_MEASURING_MODE_GDI_NATURAL, FALSE, 1,
