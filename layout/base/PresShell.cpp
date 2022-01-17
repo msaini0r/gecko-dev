@@ -5843,6 +5843,9 @@ void PresShell::DecApproximateVisibleCount(
     VisibleFrames& aFrames, const Maybe<OnNonvisible>& aNonvisibleAction
     /* = Nothing() */) {
   for (nsIFrame* frame : aFrames) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/4028
+    recordreplay::RecordReplayAssert("PresShell::DecApproximateVisibleCount #1 %zu", recordreplay::ThingIndex(frame));
+
     // Decrement the frame's visible count if we're still tracking its
     // visibility. (We may not be, if the frame disabled visibility tracking
     // after we added it to the visible frames list.)

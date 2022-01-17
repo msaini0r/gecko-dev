@@ -321,9 +321,15 @@ nsImageFrame::nsImageFrame(ComputedStyle* aStyle, nsPresContext* aPresContext,
       mReflowCallbackPosted(false),
       mForceSyncDecoding(false) {
   EnableVisibilityTracking();
+
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4028
+  recordreplay::RegisterThing(this);
 }
 
-nsImageFrame::~nsImageFrame() = default;
+nsImageFrame::~nsImageFrame() {
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4028
+  recordreplay::UnregisterThing(this);
+}
 
 NS_QUERYFRAME_HEAD(nsImageFrame)
   NS_QUERYFRAME_ENTRY(nsImageFrame)
@@ -2629,6 +2635,9 @@ nsresult nsImageFrame::AttributeChanged(int32_t aNameSpaceID,
 
 void nsImageFrame::OnVisibilityChange(
     Visibility aNewVisibility, const Maybe<OnNonvisible>& aNonvisibleAction) {
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/4028
+  recordreplay::RecordReplayAssert("nsImageFrame::OnVisibilityChange %zu", recordreplay::ThingIndex(this));
+
   if (mKind == Kind::ImageElement) {
     nsCOMPtr<nsIImageLoadingContent> imageLoader = do_QueryInterface(mContent);
     imageLoader->OnVisibilityChange(aNewVisibility, aNonvisibleAction);
