@@ -92,7 +92,8 @@ namespace recordreplay {
   Macro(SetExecutionProgressCallback, (void (*aCallback)(uint64_t)), (aCallback)) \
   Macro(ExecutionProgressReached, (), ())                                      \
   Macro(InternalAssertScriptedCaller, (const char* aWhy), (aWhy))              \
-  Macro(InternalNotifyActivity, (), ())
+  Macro(InternalNotifyActivity, (), ())                                        \
+  Macro(AddProfilerEvent, (const char* aEvent, const char* aJSON), (aEvent, aJSON))
 // clang-format on
 
 #define DECLARE_SYMBOL(aName, aReturnType, aFormals, _) \
@@ -135,18 +136,6 @@ void Initialize(int* aArgc, char*** aArgv) {
   }
   gInitialized = true;
 
-  // Only initialize if the right command line option was specified.
-  bool found = false;
-  for (int i = 0; i < *aArgc; i++) {
-    if (!strcmp((*aArgv)[i], "-recordReplayDispatch")) {
-      found = true;
-      break;
-    }
-  }
-  if (!found) {
-    return;
-  }
-
   void (*initialize)(int*, char***);
   BitwiseCast(LoadSymbol("RecordReplayInterface_Initialize"), &initialize);
   if (!initialize) {
@@ -182,14 +171,12 @@ struct AutoSuppressGCAnalysis {
 #define DEFINE_WRAPPER(aName, aReturnType, aFormals, aActuals) \
   aReturnType aName aFormals {                                 \
     AutoSuppressGCAnalysis suppress;                           \
-    MOZ_ASSERT(IsRecordingOrReplaying());                      \
     return gPtr##aName aActuals;                               \
   }
 
 #define DEFINE_WRAPPER_VOID(aName, aFormals, aActuals)     \
   void aName aFormals {                                    \
     AutoSuppressGCAnalysis suppress;                       \
-    MOZ_ASSERT(IsRecordingOrReplaying());                  \
     gPtr##aName aActuals;                                  \
   }
 
@@ -202,6 +189,7 @@ FOR_EACH_INTERFACE_VOID(DEFINE_WRAPPER_VOID)
 bool gIsRecordingOrReplaying;
 bool gIsRecording;
 bool gIsReplaying;
+bool gIsProfiling;
 
 }  // namespace recordreplay
 }  // namespace mozilla

@@ -647,6 +647,7 @@ const commands = {
   "Target.topFrameLocation": Target_topFrameLocation,
   "Target.getCurrentNetworkRequestEvent": Target_getCurrentNetworkRequestEvent,
   "Target.getCurrentNetworkStreamData": Target_getCurrentNetworkStreamData,
+  "Target.getPossibleBreakpointsForMultipleSources": Target_getPossibleBreakpointsForMultipleSources,
 };
 
 function OnProtocolCommand(method, params) {
@@ -924,7 +925,7 @@ function sourceToProtocolSourceId(source) {
   return String(id);
 }
 
-function Debugger_getPossibleBreakpoints({ sourceId, begin, end }) {
+function getPossibleBreakpoints({sourceId, begin, end}) {
   const source = protocolSourceIdToSource(sourceId);
 
   const lineLocations = new ArrayMap();
@@ -945,6 +946,20 @@ function Debugger_getPossibleBreakpoints({ sourceId, begin, end }) {
       return { line, columns };
     });
   }
+}
+function Debugger_getPossibleBreakpoints({ sourceId, begin, end }) {
+  return getPossibleBreakpoints({source, begin, end});
+}
+
+function Target_getPossibleBreakpointsForMultipleSources({ sourceIds }) {
+  return {
+    possibleBreakpoints: sourceIds.map((sourceId => {
+      const { lineLocations } = getPossibleBreakpoints({sourceId});
+      return {
+        sourceId, lineLocations
+      };
+    }))
+  };
 }
 
 function functionIdToScript(functionId) {
