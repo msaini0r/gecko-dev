@@ -537,3 +537,5 @@ function installHook(target) {
   });
   return hook;
 }
+
+exports.installHook = installHook;
