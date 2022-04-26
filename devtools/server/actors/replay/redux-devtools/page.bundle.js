@@ -1,4 +1,5 @@
-/******/ (() => { // webpackBootstrap
+/******/ function reduxDevtoolsContentScript(window){ // webpackBootstrap
+  console.log('Inside reduxDevtoolsContentScript()')
 /******/ 	var __webpack_modules__ = ({
 
 /***/ "../.yarn/__virtual__/@redux-devtools-core-virtual-041d7e0ecf/1/packages/redux-devtools/lib/esm/persistState.js":
@@ -2108,7 +2109,8 @@ function getSerializeParameter(config) {
 }
 
 function post(message) {
-  window.postMessage(message, '*');
+  // window.postMessage(message, '*');
+  window.__RECORD_REPLAY_REDUX_DEVTOOLS_SEND_BRIDGE__(message)
 }
 
 function getStackTrace(config, toExcludeFromTrace) {
@@ -10360,6 +10362,9 @@ function __REDUX_DEVTOOLS_EXTENSION__(config) {
       reportId = (0,_app_stores_enhancerStore__WEBPACK_IMPORTED_MODULE_1__.getUrlParam)('remotedev_report');
       if (reportId) (0,_app_api_openWindow__WEBPACK_IMPORTED_MODULE_7__["default"])();
     }
+
+      console.log('Posting start message')
+      window.postMessage({type: 'START', source: '@devtools-extension'}, '*')
   }
 
   function handleChange() {
@@ -10465,6 +10470,10 @@ function reduxDevtoolsExtensionCompose() {
 window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ = reduxDevtoolsExtensionCompose;
 })();
 
-/******/ })()
-;
+
+
+
+/******/ }
+
+exports.reduxDevtoolsContentScript = reduxDevtoolsContentScript
 //# sourceMappingURL=page.bundle.js.map
