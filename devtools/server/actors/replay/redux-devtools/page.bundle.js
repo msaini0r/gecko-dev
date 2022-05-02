@@ -1,5 +1,4 @@
 /******/ function reduxDevtoolsContentScript(window){ // webpackBootstrap
-  console.log('Inside reduxDevtoolsContentScript()')
 /******/ 	var __webpack_modules__ = ({
 
 /***/ "../.yarn/__virtual__/@redux-devtools-core-virtual-041d7e0ecf/1/packages/redux-devtools/lib/esm/persistState.js":
@@ -10363,7 +10362,6 @@ function __REDUX_DEVTOOLS_EXTENSION__(config) {
       if (reportId) (0,_app_api_openWindow__WEBPACK_IMPORTED_MODULE_7__["default"])();
     }
 
-      console.log('Posting start message')
       window.postMessage({type: 'START', source: '@devtools-extension'}, '*')
   }
 

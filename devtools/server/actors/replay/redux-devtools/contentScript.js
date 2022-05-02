@@ -12,7 +12,7 @@ function initialize(dbgWindow, RecordReplayControl) {
     (message) => {
       RecordReplayControl.onAnnotation(
         "redux-devtools-bridge",
-        JSON.stringify({ message })
+        JSON.stringify(message )
       );
     };
 
