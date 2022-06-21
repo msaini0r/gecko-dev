@@ -80,7 +80,10 @@ extern MFBT_DATA bool gIsReplaying;
 extern MFBT_DATA bool gIsProfiling;
 
 // Get the kind of recording/replaying process this is, if any.
-static inline bool IsRecordingOrReplaying() { return gIsRecordingOrReplaying; }
+MFBT_API bool InternalIsRecordingOrReplaying(const char* aLabel);
+static inline bool IsRecordingOrReplaying(const char* aLabel) {
+  return InternalIsRecordingOrReplaying(aLabel);
+}
 static inline bool IsRecording() { return gIsRecording; }
 static inline bool IsReplaying() { return gIsReplaying; }
 
